@@ -1,0 +1,57 @@
+.dashboard-container {
+  padding: 24px;
+  background-color: #f8f9fa;
+  min-height: 100vh;
+}
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  h1 { color: #113233; margin: 0; }
+  .role-badge {
+    background: #113233;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+  }
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+
+  .card-metric {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    text-align: center;
+    .metric-label { font-size: 12px; color: #6c757d; font-weight: bold; }
+    h3 { font-size: 32px; margin: 8px 0 4px; }
+  }
+}
+
+.card-critical {
+  background: #fff3cd;
+  border-left: 6px solid #ffc107;
+  padding: 20px;
+  border-radius: 8px;
+  margin-top: 12px;
+
+  .btn-action {
+    background: #113233;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-top: 12px;
+  }
+}

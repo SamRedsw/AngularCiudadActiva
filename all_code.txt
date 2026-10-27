@@ -1,0 +1,1219 @@
+﻿
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\core\interceptors\auth.interceptor.ts
+========================================
+
+import { HttpInterceptorFn } from '@angular/common/http';
+
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const token = localStorage.getItem('jwt_token');
+  if (token) {
+    const cloned = req.clone({
+      setHeaders: { Authorization: `Bearer ${token}` }
+    });
+    return next(cloned);
+  }
+  return next(req);
+};
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\core\models\models.ts
+========================================
+
+export interface ApiResponse<T> {
+  success: boolean;
+  message?: string;
+  data?: T;
+  timestamp?: string;
+}
+
+export interface UsuarioModel {
+  id: number;
+  nombre: string;
+  email: string;
+  telefono?: string;
+  direccion?: string;
+  fotoUrl?: string;
+  activo: boolean;
+  rol: string;
+  laboresActivas?: number;
+  creadoEn?: string;
+}
+
+export interface UsuarioUpdateRequest {
+  nombre?: string;
+  email?: string;
+  telefono?: string;
+  direccion?: string;
+  fotoUrl?: string;
+  activo?: boolean;
+}
+
+export interface UsuarioCreateAdminRequest {
+  nombre: string;
+  email: string;
+  password?: string;
+  telefono?: string;
+  direccion?: string;
+  rol: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  tipoToken?: string;
+  tipo?: string;
+  usuario?: UsuarioModel;
+  id?: number;
+  email?: string;
+  nombre?: string;
+  rol?: string;
+}
+
+export interface CategoriaModel {
+  id: number;
+  nombre: string;
+  descripcion?: string;
+  icono?: string;
+  activa?: boolean;
+  totalReportes?: number;
+  semaforo?: SemaforoModel;
+}
+
+export interface CategoriaCreateRequest {
+  nombre: string;
+  descripcion?: string;
+  icono?: string;
+}
+
+export interface SemaforoModel {
+  cantidadReportes: number;
+  colorHex: string;
+  colorNombre: string;
+  nivelAlerta: string;
+  descripcion: string;
+  porcentajeSaturacion: number;
+}
+
+export interface ReporteResponse {
+  id: number;
+  titulo: string;
+  descripcion: string;
+  categoriaId?: number;
+  categoriaNombre?: string;
+  categoriaIcono?: string;
+  ciudadanoId?: number;
+  ciudadanoNombre?: string;
+  direccion?: string;
+  latitud?: number;
+  longitud?: number;
+  imagenUrl?: string;
+  tieneFoto?: boolean;
+  fotoTipo?: string;
+  estado: string; // PENDIENTE, ADMITIDO, RECHAZADO, EN_PROCESO, ATENDIDO, CERRADO
+  prioridad?: string; // BAJA, MEDIA, ALTA, CRITICA
+  justificacionRechazo?: string;
+  evidenciaCierreUrl?: string;
+  tieneFotoSolucion?: boolean;
+  operadorAsignadoNombre?: string;
+  reportesCercanos?: number;
+  semaforoColorHex?: string;
+  semaforoNivel?: string;
+  semaforoDescripcion?: string;
+  creadoEn?: string;
+  actualizadoEn?: string;
+  fechaCierre?: string;
+}
+
+export interface ReporteCreateRequest {
+  titulo: string;
+  descripcion: string;
+  categoriaId: number;
+  latitud?: number;
+  longitud?: number;
+  direccion?: string;
+  imagenUrl?: string;
+}
+
+export interface AsignacionModel {
+  id: number;
+  reporteId: number;
+  reporteTitulo?: string;
+  operadorId: number;
+  operadorNombre?: string;
+  gestorId?: number;
+  gestorNombre?: string;
+  notas?: string;
+  activa: boolean;
+  creadoEn?: string;
+}
+
+export interface AsignacionCreateRequest {
+  operadorId: number;
+  notas?: string;
+}
+
+export interface SeguimientoModel {
+  id: number;
+  reporteId?: number;
+  reporteTitulo?: string;
+  usuarioId?: number;
+  usuarioNombre?: string;
+  usuarioEmail?: string;
+  usuarioRol?: string;
+  estadoAnterior?: string;
+  estadoNuevo?: string;
+  accion?: string;
+  observaciones?: string;
+  evidenciaUrl?: string;
+  hashTrazabilidad?: string;
+  creadoEn?: string;
+}
+
+export interface ComentarioModel {
+  id: number;
+  reporteId: number;
+  usuarioId: number;
+  usuarioNombre: string;
+  usuarioRol?: string;
+  contenido: string;
+  creadoEn?: string;
+  actualizadoEn?: string;
+}
+
+export interface EstadisticasModel {
+  totalReportes: number;
+  reportesPorEstado: Record<string, number>;
+  reportesPorCategoria: Record<string, number>;
+  reportesPorPrioridad: Record<string, number>;
+  tiempoPromedioAtencionHoras: number;
+  reportesAtendidosOCerrados: number;
+  reportesPendientes: number;
+  semaforoGlobal?: SemaforoModel;
+  semaforoPorCategoria: Record<string, SemaforoModel>;
+}
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\core\services\api.service.ts
+========================================
+
+import { Injectable } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { 
+  ApiResponse, AuthResponse, UsuarioModel, UsuarioUpdateRequest, 
+  CategoriaModel, CategoriaCreateRequest, ReporteResponse, ReporteCreateRequest, 
+  AsignacionModel, AsignacionCreateRequest, SeguimientoModel, ComentarioModel, 
+  EstadisticasModel, UsuarioCreateAdminRequest 
+} from '../models/models';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class ApiService {
+  private baseUrl = 'https://ciudadactiva-4ah7.onrender.com/api';
+
+  constructor(private http: HttpClient) {}
+
+  // AutenticaciÃ³n y Perfil
+  login(credentials: { email: string; password: string }): Observable<ApiResponse<AuthResponse>> {
+    return this.http.post<ApiResponse<AuthResponse>>(`${this.baseUrl}/auth/login`, credentials);
+  }
+
+  registrar(data: any): Observable<ApiResponse<AuthResponse>> {
+    return this.http.post<ApiResponse<AuthResponse>>(`${this.baseUrl}/auth/register`, data);
+  }
+
+  getMiPerfil(): Observable<ApiResponse<UsuarioModel>> {
+    return this.http.get<ApiResponse<UsuarioModel>>(`${this.baseUrl}/usuarios/me`);
+  }
+
+  updateMiPerfil(data: UsuarioUpdateRequest): Observable<ApiResponse<UsuarioModel>> {
+    return this.http.put<ApiResponse<UsuarioModel>>(`${this.baseUrl}/usuarios/me`, data);
+  }
+
+  // CategorÃ­as
+  getCategorias(): Observable<ApiResponse<CategoriaModel[]>> {
+    return this.http.get<ApiResponse<CategoriaModel[]>>(`${this.baseUrl}/categorias`);
+  }
+
+  crearCategoria(data: CategoriaCreateRequest): Observable<ApiResponse<CategoriaModel>> {
+    return this.http.post<ApiResponse<CategoriaModel>>(`${this.baseUrl}/categorias`, data);
+  }
+
+  // Reportes
+  getReportes(categoriaId?: number, estado?: string, prioridad?: string): Observable<ApiResponse<ReporteResponse[]>> {
+    let params = new HttpParams();
+    if (categoriaId) params = params.set('categoriaId', categoriaId.toString());
+    if (estado) params = params.set('estado', estado);
+    if (prioridad) params = params.set('prioridad', prioridad);
+    return this.http.get<ApiResponse<ReporteResponse[]>>(`${this.baseUrl}/reportes`, { params });
+  }
+
+  getMisReportes(): Observable<ApiResponse<ReporteResponse[]>> {
+    return this.http.get<ApiResponse<ReporteResponse[]>>(`${this.baseUrl}/reportes/mis-reportes`);
+  }
+
+  getReporteDetalle(id: number): Observable<ApiResponse<ReporteResponse>> {
+    return this.http.get<ApiResponse<ReporteResponse>>(`${this.baseUrl}/reportes/${id}`);
+  }
+
+  crearReporte(data: ReporteCreateRequest): Observable<ApiResponse<ReporteResponse>> {
+    return this.http.post<ApiResponse<ReporteResponse>>(`${this.baseUrl}/reportes`, data);
+  }
+
+  crearReporteConFoto(formData: FormData): Observable<ApiResponse<ReporteResponse>> {
+    return this.http.post<ApiResponse<ReporteResponse>>(`${this.baseUrl}/reportes/con-foto`, formData);
+  }
+
+  eliminarReporte(id: number): Observable<ApiResponse<void>> {
+    return this.http.delete<ApiResponse<void>>(`${this.baseUrl}/reportes/${id}`);
+  }
+
+  // GestiÃ³n (Gestor / Admin)
+  validarReporte(id: number, body: { admitido: boolean; justificacion?: string; prioridad?: string }): Observable<ApiResponse<ReporteResponse>> {
+    return this.http.patch<ApiResponse<ReporteResponse>>(`${this.baseUrl}/reportes/${id}/validar`, body);
+  }
+
+  asignarOperador(id: number, body: AsignacionCreateRequest): Observable<ApiResponse<AsignacionModel>> {
+    return this.http.post<ApiResponse<AsignacionModel>>(`${this.baseUrl}/reportes/${id}/asignaciones`, body);
+  }
+
+  getAsignacionesActivas(): Observable<ApiResponse<AsignacionModel[]>> {
+    return this.http.get<ApiResponse<AsignacionModel[]>>(`${this.baseUrl}/asignaciones`);
+  }
+
+  getOperadores(): Observable<ApiResponse<UsuarioModel[]>> {
+    return this.http.get<ApiResponse<UsuarioModel[]>>(`${this.baseUrl}/operadores`);
+  }
+
+  // Operaciones de Campo
+  getMisAsignaciones(): Observable<ApiResponse<AsignacionModel[]>> {
+    return this.http.get<ApiResponse<AsignacionModel[]>>(`${this.baseUrl}/asignaciones/mis-asignaciones`);
+  }
+
+  registrarAvance(id: number, body: { nuevoEstado?: string; accion: string; observaciones: string }): Observable<ApiResponse<SeguimientoModel>> {
+    return this.http.post<ApiResponse<SeguimientoModel>>(`${this.baseUrl}/reportes/${id}/seguimientos`, body);
+  }
+
+  cerrarReporte(id: number, body: { evidenciaCierreUrl: string; observaciones?: string }): Observable<ApiResponse<ReporteResponse>> {
+    return this.http.patch<ApiResponse<ReporteResponse>>(`${this.baseUrl}/reportes/${id}/cerrar`, body);
+  }
+
+  subirFotoSolucion(id: number, formData: FormData): Observable<ApiResponse<ReporteResponse>> {
+    return this.http.post<ApiResponse<ReporteResponse>>(`${this.baseUrl}/reportes/${id}/foto-solucion`, formData);
+  }
+
+  // Comentarios
+  getComentarios(reporteId: number): Observable<ApiResponse<ComentarioModel[]>> {
+    return this.http.get<ApiResponse<ComentarioModel[]>>(`${this.baseUrl}/reportes/${reporteId}/comentarios`);
+  }
+
+  agregarComentario(reporteId: number, contenido: string): Observable<ApiResponse<ComentarioModel>> {
+    return this.http.post<ApiResponse<ComentarioModel>>(`${this.baseUrl}/reportes/${reporteId}/comentarios`, { contenido });
+  }
+
+  // EstadÃ­sticas y Admin
+  getEstadisticas(): Observable<ApiResponse<EstadisticasModel>> {
+    return this.http.get<ApiResponse<EstadisticasModel>>(`${this.baseUrl}/estadisticas/reportes`);
+  }
+
+  getUsuarios(): Observable<ApiResponse<UsuarioModel[]>> {
+    return this.http.get<ApiResponse<UsuarioModel[]>>(`${this.baseUrl}/admin/usuarios`);
+  }
+
+  crearUsuarioAdmin(data: UsuarioCreateAdminRequest): Observable<ApiResponse<UsuarioModel>> {
+    return this.http.post<ApiResponse<UsuarioModel>>(`${this.baseUrl}/admin/usuarios`, data);
+  }
+
+  getAuditoriaRUP(): Observable<ApiResponse<SeguimientoModel[]>> {
+    return this.http.get<ApiResponse<SeguimientoModel[]>>(`${this.baseUrl}/admin/auditoria`);
+  }
+}
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\features\auth\login.component.html
+========================================
+
+<div class="login-container">
+  <div class="login-card">
+    <div class="brand-header">
+      <img src="assets/logo-ciudadactiva.svg" alt="CiudadActiva Logo" class="logo" />
+      <h2>ciudadactiva</h2>
+      <p class="subtitle">GestiÃ³n y Seguimiento Comunitario</p>
+    </div>
+
+    <!-- Cuentas Demo -->
+    <div class="demo-buttons">
+      <p class="demo-title">Acceso RÃ¡pido Pruebas:</p>
+      <div class="btn-group">
+        <button *ngFor="let acc of demoAccounts" (click)="selectDemoAccount(acc)" type="button" class="btn-demo">
+          {{ acc.label }}
+        </button>
+      </div>
+    </div>
+
+    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+      <div class="form-group">
+        <label>Correo ElectrÃ³nico</label>
+        <input type="email" formControlName="email" placeholder="tu_correo@ejemplo.com" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>ContraseÃ±a</label>
+        <div class="password-input">
+          <input [type]="passwordVisible ? 'text' : 'password'" formControlName="password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" class="form-control" />
+          <button type="button" (click)="togglePasswordVisibility()" class="btn-eye">
+            {{ passwordVisible ? 'ðŸ™ˆ' : 'ðŸ‘ï¸' }}
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="errorMessage" class="error-banner">
+        {{ errorMessage }}
+      </div>
+
+      <button type="submit" [disabled]="loginForm.invalid || isLoading" class="btn-submit">
+        <span *ngIf="!isLoading">Ingresar a la Plataforma</span>
+        <span *ngIf="isLoading">Cargando...</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\features\auth\login.component.scss
+========================================
+
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f8f9fa;
+}
+
+.login-card {
+  background: #ffffff;
+  padding: 32px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 400px;
+}
+
+.brand-header {
+  text-align: center;
+  margin-bottom: 24px;
+  .logo { width: 64px; height: 64px; }
+  h2 { color: #113233; margin: 8px 0; }
+  .subtitle { color: #6c757d; font-size: 14px; }
+}
+
+.form-group {
+  margin-bottom: 16px;
+  label { display: block; margin-bottom: 6px; font-weight: 600; color: #113233; }
+  .form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ced4da;
+    border-radius: 8px;
+    box-sizing: border-box;
+  }
+}
+
+.btn-submit {
+  width: 100%;
+  padding: 12px;
+  background: #113233;
+  color: #ffffff;
+  border: none;
+  border-radius: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  &:disabled { opacity: 0.6; }
+}
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\features\auth\login.component.ts
+========================================
+
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
+import { ApiService } from '../../core/services/api.service';
+
+@Component({
+  selector: 'app-login',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule],
+  templateUrl: './login.component.html',
+  styleUrls: ['./login.component.scss']
+})
+export class LoginComponent {
+  loginForm: FormGroup;
+  isLoading = false;
+  errorMessage: string | null = null;
+  passwordVisible = false;
+
+  demoAccounts = [
+    { label: 'Ciudadano', email: 'ciudadano@ciudadactiva.gov.co', pass: 'Ciudadano123!' },
+    { label: 'Gestor', email: 'gestor@ciudadactiva.gov.co', pass: 'Gestor123!' },
+    { label: 'Operador', email: 'operador@ciudadactiva.gov.co', pass: 'Operador123!' },
+    { label: 'Admin', email: 'admin@ciudadactiva.gov.co', pass: 'Admin123!' }
+  ];
+
+  constructor(
+    private fb: FormBuilder,
+    private apiService: ApiService,
+    private router: Router
+  ) {
+    this.loginForm = this.fb.group({
+      email: ['', [Validators.required, Validators.email]],
+      password: ['', [Validators.required, Validators.minLength(6)]]
+    });
+  }
+
+  selectDemoAccount(acc: { email: string; pass: string }) {
+    this.loginForm.patchValue({
+      email: acc.email,
+      password: acc.pass
+    });
+  }
+
+  togglePasswordVisibility() {
+    this.passwordVisible = !this.passwordVisible;
+  }
+
+  onSubmit() {
+    if (this.loginForm.invalid) return;
+
+    this.isLoading = true;
+    this.errorMessage = null;
+
+    this.apiService.login(this.loginForm.value).subscribe({
+      next: (res) => {
+        this.isLoading = false;
+        if (res.success && res.data) {
+          const auth = res.data;
+          localStorage.setItem('jwt_token', auth.token);
+          localStorage.setItem('user_role', auth.rol || auth.usuario?.rol || 'ROLE_CIUDADANO');
+          localStorage.setItem('user_name', auth.nombre || auth.usuario?.nombre || '');
+          
+          // RedirecciÃ³n por Rol
+          const role = auth.rol || auth.usuario?.rol;
+          if (role === 'ROLE_GESTOR') this.router.navigate(['/gestor/dashboard']);
+          else if (role === 'ROLE_OPERADOR') this.router.navigate(['/operador/tareas']);
+          else if (role === 'ROLE_ADMIN') this.router.navigate(['/admin/panel']);
+          else this.router.navigate(['/ciudadano/home']);
+        }
+      },
+      error: (err) => {
+        this.isLoading = false;
+        this.errorMessage = 'Credenciales invÃ¡lidas o problema de conexiÃ³n con el servidor.';
+      }
+    });
+  }
+}
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\features\gestor\gestor-dashboard.component.html
+========================================
+
+<div class="dashboard-container">
+  <header class="top-bar">
+    <h1>Triage Operativo</h1>
+    <span class="role-badge">GESTOR</span>
+  </header>
+
+  <!-- MÃ©tricas Clave -->
+  <div class="metrics-grid">
+    <div class="card-metric">
+      <span class="metric-label">PENDIENTES</span>
+      <h3 class="text-danger">{{ pendientes.length }}</h3>
+      <small>Por Validar</small>
+    </div>
+
+    <div class="card-metric">
+      <span class="metric-label">POR ASIGNAR</span>
+      <h3 class="text-warning">{{ stats?.reportesPorEstado?.['ADMITIDO'] || 0 }}</h3>
+      <small>Admitidos</small>
+    </div>
+
+    <div class="card-metric">
+      <span class="metric-label">EN CAMPO</span>
+      <h3 class="text-teal">{{ asignaciones.length }}</h3>
+      <small>En Proceso</small>
+    </div>
+  </div>
+
+  <!-- Triage CrÃ­tico -->
+  <section class="triage-section">
+    <h4>REQUIERE ATENCIÃ“N INMEDIATA (TRIAGE)</h4>
+
+    <div *ngIf="reporteCritico" class="card-critical">
+      <div class="critical-header">
+        <span class="badge-critical">{{ reporteCritico.prioridad || 'MEDIA' }} â€¢ PENDIENTE</span>
+      </div>
+      <h3>{{ reporteCritico.titulo }}</h3>
+      <p>{{ reporteCritico.direccion || 'Sector Urbano' }} â€¢ Requiere validaciÃ³n oficial</p>
+      <button (click)="inspeccionar(reporteCritico.id)" class="btn-action">
+        Validar y Asignar â†’
+      </button>
+    </div>
+
+    <div *ngIf="!reporteCritico && !isLoading" class="card-empty">
+      âœ“ No hay incidencias urgentes pendientes de validaciÃ³n.
+    </div>
+  </section>
+</div>
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\features\gestor\gestor-dashboard.component.scss
+========================================
+
+.dashboard-container {
+  padding: 24px;
+  background-color: #f8f9fa;
+  min-height: 100vh;
+}
+
+.top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  h1 { color: #113233; margin: 0; }
+  .role-badge {
+    background: #113233;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+  }
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+
+  .card-metric {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    text-align: center;
+    .metric-label { font-size: 12px; color: #6c757d; font-weight: bold; }
+    h3 { font-size: 32px; margin: 8px 0 4px; }
+  }
+}
+
+.card-critical {
+  background: #fff3cd;
+  border-left: 6px solid #ffc107;
+  padding: 20px;
+  border-radius: 8px;
+  margin-top: 12px;
+
+  .btn-action {
+    background: #113233;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-top: 12px;
+  }
+}
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\features\gestor\gestor-dashboard.component.ts
+========================================
+
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
+import { ApiService } from '../../core/services/api.service';
+import { ReporteResponse, AsignacionModel, EstadisticasModel } from '../../core/models/models';
+
+@Component({
+  selector: 'app-gestor-dashboard',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './gestor-dashboard.component.html',
+  styleUrls: ['./gestor-dashboard.component.scss']
+})
+export class GestorDashboardComponent implements OnInit {
+  pendientes: ReporteResponse[] = [];
+  asignaciones: AsignacionModel[] = [];
+  stats: EstadisticasModel | null = null;
+  reporteCritico: ReporteResponse | null = null;
+  isLoading = true;
+
+  constructor(private apiService: ApiService, private router: Router) {}
+
+  ngOnInit(): void {
+    this.cargarDatos();
+  }
+
+  cargarDatos(): void {
+    this.isLoading = true;
+
+    this.apiService.getReportes(undefined, 'PENDIENTE').subscribe(res => {
+      if (res.success && res.data) {
+        this.pendientes = res.data;
+        this.reporteCritico = this.pendientes.find(r => r.prioridad === 'CRITICA') || this.pendientes[0] || null;
+      }
+    });
+
+    this.apiService.getAsignacionesActivas().subscribe(res => {
+      if (res.success && res.data) {
+        this.asignaciones = res.data;
+      }
+    });
+
+    this.apiService.getEstadisticas().subscribe(res => {
+      if (res.success && res.data) {
+        this.stats = res.data;
+      }
+      this.isLoading = false;
+    });
+  }
+
+  inspeccionar(id: number): void {
+    this.router.navigate(['/gestor/inspeccion', id]);
+  }
+}
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\features\gestor\gestor-inspeccion.component.html
+========================================
+
+<div class="inspeccion-container">
+  <!-- Encabezado con BotÃ³n Volver -->
+  <header class="header-nav">
+    <button class="btn-back" (click)="router.navigate(['/gestor/dashboard'])">
+      â† Volver al Dashboard
+    </button>
+    <h2>Ficha TÃ©cnica de InspecciÃ³n y Triage</h2>
+    <span class="role-badge">GESTOR OPERATIVO</span>
+  </header>
+
+  <!-- Estado de Carga -->
+  <div *ngIf="!reporte && !errorMessage" class="loading-box">
+    <p>Cargando informaciÃ³n detallada del reporte #{{ reporteId }}...</p>
+  </div>
+
+  <!-- Mensaje de Error / Alerta de Regla de Negocio -->
+  <div *ngIf="errorMessage" class="alert-banner error">
+    <span>âš ï¸ {{ errorMessage }}</span>
+  </div>
+
+  <!-- Detalle Principal del Reporte -->
+  <div *ngIf="reporte" class="grid-layout">
+    
+    <!-- Columna Izquierda: Evidencia Visual y GeolocalizaciÃ³n -->
+    <div class="card media-card">
+      <div class="image-wrapper">
+        <img 
+          [src]="reporte.imagenUrl || 'assets/placeholder-incidencia.jpg'" 
+          alt="Evidencia fotogrÃ¡fica de la incidencia" 
+          class="reporte-img"
+        />
+        <span class="status-tag" [ngClass]="reporte.estado.toLowerCase()">
+          {{ reporte.estado }}
+        </span>
+      </div>
+
+      <div class="location-box">
+        <h4>UbicaciÃ³n del Incidente</h4>
+        <p class="address">ðŸ“ {{ reporte.direccion || 'DirecciÃ³n no especificada' }}</p>
+        <p class="coords" *ngIf="reporte.latitud && reporte.longitud">
+          GPS: {{ reporte.latitud }}, {{ reporte.longitud }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Columna Derecha: InformaciÃ³n y Formulario de Decisiones (Triage) -->
+    <div class="card details-card">
+      <div class="header-details">
+        <span class="category-badge">
+          {{ reporte.categoriaNombre || 'Incidencia Urbana' }}
+        </span>
+        <small class="date">Registrado el: {{ reporte.creadoEn | date:'dd/MM/yyyy HH:mm' }}</small>
+      </div>
+
+      <h1 class="reporte-titulo">{{ reporte.titulo }}</h1>
+      <p class="reporte-descripcion">{{ reporte.descripcion }}</p>
+
+      <div class="citizen-info">
+        <p><strong>Reportado por:</strong> {{ reporte.ciudadanoNombre || 'Ciudadano AnÃ³nimo' }}</p>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Panel de Decisiones de Triage del Gestor (RN02) -->
+      <section class="triage-panel" *ngIf="reporte.estado === 'PENDIENTE'">
+        <h3>Triage y DefiniciÃ³n de Prioridad (RN02)</h3>
+        <p class="help-text">
+          Defina la prioridad oficial de atenciÃ³n requerida para esta incidencia antes de su admisiÃ³n.
+        </p>
+
+        <div class="form-group">
+          <label for="prioridadSelect">Prioridad Oficial:</label>
+          <select id="prioridadSelect" [(ngModel)]="prioridadSeleccionada" class="form-control">
+            <option value="BAJA">ðŸŸ¢ BAJA - Mantenimiento Programado</option>
+            <option value="MEDIA">ðŸŸ¡ MEDIA - Atencion EstÃ¡ndar</option>
+            <option value="ALTA">ðŸŸ  ALTA - AtenciÃ³n Prioritaria</option>
+            <option value="CRITICA">ðŸ”´ CRÃTICA - Riesgo Inminente / Emergencia</option>
+          </select>
+        </div>
+
+        <!-- Acciones Principales del Gestor -->
+        <div class="action-buttons">
+          <button type="button" class="btn-reject" (click)="mostrarModalRechazo = true">
+            âœ• Rechazar Reporte
+          </button>
+
+          <button type="button" class="btn-approve" (click)="admitirYPriorizar()">
+            âœ“ Admitir y Priorizar
+          </button>
+        </div>
+      </section>
+
+      <!-- Panel de Estado si el Reporte ya fue procesado -->
+      <section class="processed-panel" *ngIf="reporte.estado !== 'PENDIENTE'">
+        <div class="info-box">
+          <p><strong>Estado Actual:</strong> {{ reporte.estado }}</p>
+          <p *ngIf="reporte.prioridad"><strong>Prioridad Asignada:</strong> {{ reporte.prioridad }}</p>
+          <p *ngIf="reporte.operadorAsignadoNombre">
+            <strong>Operador en Campo:</strong> {{ reporte.operadorAsignadoNombre }}
+          </p>
+          <p *ngIf="reporte.justificacionRechazo" class="text-danger">
+            <strong>Motivo de Rechazo:</strong> {{ reporte.justificacionRechazo }}
+          </p>
+        </div>
+      </section>
+    </div>
+
+  </div>
+
+  <!-- Modal de Rechazo Obligatorio (RN01) -->
+  <div class="modal-overlay" *ngIf="mostrarModalRechazo">
+    <div class="modal-card">
+      <h3>Rechazar Incidencia (RN01)</h3>
+      <p class="modal-desc">
+        Indique la justificaciÃ³n tÃ©cnica de rechazo. Esta serÃ¡ notificada de forma transparente al ciudadano[cite: 5].
+      </p>
+
+      <div class="form-group">
+        <label for="motivoInput">JustificaciÃ³n de Rechazo (Obligatoria):</label>
+        <textarea 
+          id="motivoInput" 
+          [(ngModel)]="motivoRechazo" 
+          rows="4" 
+          placeholder="Ej. El reporte no corresponde a un espacio pÃºblico de competencia municipal o carece de informaciÃ³n..."
+          class="form-control"
+        ></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" (click)="mostrarModalRechazo = false; errorMessage = null;">
+          Cancelar
+        </button>
+        <button type="button" class="btn-confirm-reject" (click)="confirmarRechazo()">
+          Confirmar Rechazo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de AsignaciÃ³n a Operador / Cuadrilla (RF05) -->
+  <div class="modal-overlay" *ngIf="mostrarModalAsignar">
+    <div class="modal-card">
+      <h3>AsignaciÃ³n a Cuadrilla Operativa (RF05)</h3>
+      <p class="modal-desc">
+        Seleccione el operador responsable para ejecutar las acciones en terreno.
+      </p>
+
+      <div class="form-group">
+        <label for="operadorSelect">Operador / Cuadrilla Responsable:</label>
+        <select id="operadorSelect" [(ngModel)]="operadorSeleccionadoId" class="form-control">
+          <option *ngFor="let op of operadores" [value]="op.id">
+            ðŸ‘¤ {{ op.nombre }} ({{ op.email }})
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="notasInput">Instrucciones / Notas de Campo (Opcional):</label>
+        <textarea 
+          id="notasInput" 
+          [(ngModel)]="notasAsignacion" 
+          rows="3" 
+          placeholder="Ej. Inspeccionar tramo vial y realizar parcheo de emergencia con mezcla asfÃ¡ltica..."
+          class="form-control"
+        ></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-confirm-assign" (click)="confirmarAsignacion()">
+          Finalizar AsignaciÃ³n y Notificar
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\features\gestor\gestor-inspeccion.component.scss
+========================================
+
+.inspeccion-container {
+  padding: 24px;
+}
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\features\gestor\gestor_inspeccion.component.ts
+========================================
+
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ActivatedRoute, Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { ApiService } from '../../core/services/api.service';
+import { ReporteResponse, UsuarioModel } from '../../core/models/models';
+
+@Component({
+  selector: 'app-gestor-inspeccion',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  templateUrl: './gestor-inspeccion.component.html',
+  styleUrls: ['./gestor-inspeccion.component.scss']
+})
+export class GestorInspeccionComponent implements OnInit {
+  reporteId!: number;
+  reporte: ReporteResponse | null = null;
+  operadores: UsuarioModel[] = [];
+  prioridadSeleccionada = 'ALTA';
+  
+  // Modales y Reglas
+  mostrarModalRechazo = false;
+  motivoRechazo = '';
+  mostrarModalAsignar = false;
+  operadorSeleccionadoId: number | null = null;
+  notasAsignacion = '';
+  errorMessage: string | null = null;
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private apiService: ApiService
+  ) {}
+
+  ngOnInit(): void {
+    this.reporteId = Number(this.route.snapshot.paramMap.get('id'));
+    this.cargarDetalle();
+  }
+
+  cargarDetalle(): void {
+    this.apiService.getReporteDetalle(this.reporteId).subscribe(res => {
+      if (res.success && res.data) {
+        this.reporte = res.data;
+      }
+    });
+
+    this.apiService.getOperadores().subscribe(res => {
+      if (res.success && res.data) {
+        this.operadores = res.data;
+      }
+    });
+  }
+
+  // RN01: Rechazo con JustificaciÃ³n Obligatoria
+  confirmarRechazo(): void {
+    if (!this.motivoRechazo.trim()) {
+      this.errorMessage = 'RN01: La justificaciÃ³n tÃ©cnica de rechazo es obligatoria.';
+      return;
+    }
+
+    this.apiService.validarReporte(this.reporteId, {
+      admitido: false,
+      justificacion: this.motivoRechazo
+    }).subscribe(res => {
+      if (res.success) {
+        this.router.navigate(['/gestor/dashboard']);
+      }
+    });
+  }
+
+  // RN02: PriorizaciÃ³n por Gestor
+  admitirYPriorizar(): void {
+    this.apiService.validarReporte(this.reporteId, {
+      admitido: true,
+      prioridad: this.prioridadSeleccionada,
+      justificacion: 'Admitido oficialmente por Gestor'
+    }).subscribe(res => {
+      if (res.success) {
+        this.mostrarModalAsignar = true;
+      }
+    });
+  }
+
+  confirmarAsignacion(): void {
+    const opId = this.operadorSeleccionadoId || this.operadores[0]?.id;
+    if (!opId) return;
+
+    this.apiService.asignarOperador(this.reporteId, {
+      operadorId: opId,
+      notas: this.notasAsignacion
+    }).subscribe(res => {
+      if (res.success) {
+        this.router.navigate(['/gestor/dashboard']);
+      }
+    });
+  }
+}
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\app.config.server.ts
+========================================
+
+import { mergeApplicationConfig, ApplicationConfig } from '@angular/core';
+import { provideServerRendering, withRoutes } from '@angular/ssr';
+import { appConfig } from './app.config';
+import { serverRoutes } from './app.routes.server';
+
+const serverConfig: ApplicationConfig = {
+  providers: [
+    provideServerRendering(withRoutes(serverRoutes))
+  ]
+};
+
+export const config = mergeApplicationConfig(appConfig, serverConfig);
+
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\app.config.ts
+========================================
+
+import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { routes } from './app.routes';
+import { authInterceptor } from './core/interceptors/auth.interceptor';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideZoneChangeDetection({ eventCoalescing: true }),
+    provideRouter(routes),
+    provideHttpClient(withInterceptors([authInterceptor]))
+  ]
+};
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\app.html
+========================================
+
+<router-outlet></router-outlet>
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\app.routes.server.ts
+========================================
+
+import { RenderMode, ServerRoute } from '@angular/ssr';
+
+export const serverRoutes: ServerRoute[] = [
+  {
+    path: '**',
+    renderMode: RenderMode.Prerender
+  }
+];
+
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\app.routes.ts
+========================================
+
+import { Routes } from '@angular/router';
+import { LoginComponent } from './features/auth/login.component';
+import { GestorDashboardComponent } from './features/gestor/gestor-dashboard.component';
+
+export const routes: Routes = [
+  { path: '', redirectTo: 'login', pathMatch: 'full' },
+  { path: 'login', component: LoginComponent },
+  { path: 'gestor/dashboard', component: GestorDashboardComponent },
+  { path: '**', redirectTo: 'login' }
+];
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\app.spec.ts
+========================================
+
+import { TestBed } from '@angular/core/testing';
+import { App } from './app';
+
+describe('App', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [App],
+    })
+      .compileComponents();
+  });
+
+  it('should create the app', () => {
+    const fixture = TestBed.createComponent(App);
+    const app = fixture.componentInstance;
+    expect(app).toBeTruthy();
+  });
+
+  it('should render title', async () => {
+    const fixture = TestBed.createComponent(App);
+    await fixture.whenStable();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, ciudad-activa-web');
+  });
+});
+
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\app\app.ts
+========================================
+
+import { Component, signal } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+
+@Component({
+  imports: [RouterOutlet],
+  selector: 'app-root',
+  styleUrl: './app.css',
+  templateUrl: './app.html',
+})
+export class App {
+  protected readonly title = signal('ciudad-activa-web');
+}
+
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\index.html
+========================================
+
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CiudadActivaWeb</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+</head>
+<body>
+  <app-root></app-root>
+</body>
+</html>
+
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\main.server.ts
+========================================
+
+import { BootstrapContext, bootstrapApplication } from '@angular/platform-browser';
+import { App } from './app/app';
+import { config } from './app/app.config.server';
+
+const bootstrap = (context: BootstrapContext) =>
+    bootstrapApplication(App, config, context);
+
+export default bootstrap;
+
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\main.ts
+========================================
+
+import { bootstrapApplication } from '@angular/platform-browser';
+import { appConfig } from './app/app.config';
+import { App } from './app/app';
+
+bootstrapApplication(App, appConfig)
+  .catch((err) => console.error(err));
+
+
+========================================
+FILE: C:\Proyectos_Angular\CiudadActivaWeb\ciudad-activa-web\src\server.ts
+========================================
+
+import {
+  AngularNodeAppEngine,
+  createNodeRequestHandler,
+  isMainModule,
+  writeResponseToNodeResponse,
+} from '@angular/ssr/node';
+import express from 'express';
+import { join } from 'node:path';
+
+const browserDistFolder = join(import.meta.dirname, '../browser');
+
+const app = express();
+const angularApp = new AngularNodeAppEngine();
+
+/**
+ * Example Express Rest API endpoints can be defined here.
+ * Uncomment and define endpoints as necessary.
+ *
+ * Example:
+ * ```ts
+ * app.get('/api/{*splat}', (req, res) => {
+ *   // Handle API request
+ * });
+ * ```
+ */
+
+/**
+ * Serve static files from /browser
+ */
+app.use(
+  express.static(browserDistFolder, {
+    maxAge: '1y',
+    index: false,
+    redirect: false,
+  }),
+);
+
+/**
+ * Handle all other requests by rendering the Angular application.
+ */
+app.use((req, res, next) => {
+  angularApp
+    .handle(req)
+    .then((response) =>
+      response ? writeResponseToNodeResponse(response, res) : next(),
+    )
+    .catch(next);
+});
+
+/**
+ * Start the server if this module is the main entry point, or it is ran via PM2.
+ * The server listens on the port defined by the `PORT` environment variable, or defaults to 4000.
+ */
+if (isMainModule(import.meta.url) || process.env['pm_id']) {
+  const port = process.env['PORT'] || 4000;
+  app.listen(port, (error) => {
+    if (error) {
+      throw error;
+    }
+
+    console.log(`Node Express server listening on http://localhost:${port}`);
+  });
+}
+
+/**
+ * Request handler used by the Angular CLI (for dev-server and during build) or Firebase Cloud Functions.
+ */
+export const reqHandler = createNodeRequestHandler(app);
+

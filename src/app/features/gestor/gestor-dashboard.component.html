@@ -1,0 +1,47 @@
+<div class="dashboard-container">
+  <header class="top-bar">
+    <h1>Triage Operativo</h1>
+    <span class="role-badge">GESTOR</span>
+  </header>
+
+  <!-- Métricas Clave -->
+  <div class="metrics-grid">
+    <div class="card-metric">
+      <span class="metric-label">PENDIENTES</span>
+      <h3 class="text-danger">{{ pendientes.length }}</h3>
+      <small>Por Validar</small>
+    </div>
+
+    <div class="card-metric">
+      <span class="metric-label">POR ASIGNAR</span>
+      <h3 class="text-warning">{{ stats?.reportesPorEstado?.['ADMITIDO'] || 0 }}</h3>
+      <small>Admitidos</small>
+    </div>
+
+    <div class="card-metric">
+      <span class="metric-label">EN CAMPO</span>
+      <h3 class="text-teal">{{ asignaciones.length }}</h3>
+      <small>En Proceso</small>
+    </div>
+  </div>
+
+  <!-- Triage Crítico -->
+  <section class="triage-section">
+    <h4>REQUIERE ATENCIÓN INMEDIATA (TRIAGE)</h4>
+
+    <div *ngIf="reporteCritico" class="card-critical">
+      <div class="critical-header">
+        <span class="badge-critical">{{ reporteCritico.prioridad || 'MEDIA' }} • PENDIENTE</span>
+      </div>
+      <h3>{{ reporteCritico.titulo }}</h3>
+      <p>{{ reporteCritico.direccion || 'Sector Urbano' }} • Requiere validación oficial</p>
+      <button (click)="inspeccionar(reporteCritico.id)" class="btn-action">
+        Validar y Asignar →
+      </button>
+    </div>
+
+    <div *ngIf="!reporteCritico && !isLoading" class="card-empty">
+      ✓ No hay incidencias urgentes pendientes de validación.
+    </div>
+  </section>
+</div>

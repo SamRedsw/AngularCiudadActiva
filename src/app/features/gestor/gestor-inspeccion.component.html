@@ -1,0 +1,176 @@
+<div class="inspeccion-container">
+  <!-- Encabezado con Botón Volver -->
+  <header class="header-nav">
+    <button class="btn-back" (click)="router.navigate(['/gestor/dashboard'])">
+      ← Volver al Dashboard
+    </button>
+    <h2>Ficha Técnica de Inspección y Triage</h2>
+    <span class="role-badge">GESTOR OPERATIVO</span>
+  </header>
+
+  <!-- Estado de Carga -->
+  <div *ngIf="!reporte && !errorMessage" class="loading-box">
+    <p>Cargando información detallada del reporte #{{ reporteId }}...</p>
+  </div>
+
+  <!-- Mensaje de Error / Alerta de Regla de Negocio -->
+  <div *ngIf="errorMessage" class="alert-banner error">
+    <span>⚠️ {{ errorMessage }}</span>
+  </div>
+
+  <!-- Detalle Principal del Reporte -->
+  <div *ngIf="reporte" class="grid-layout">
+    
+    <!-- Columna Izquierda: Evidencia Visual y Geolocalización -->
+    <div class="card media-card">
+      <div class="image-wrapper">
+        <img 
+          [src]="reporte.imagenUrl || 'assets/placeholder-incidencia.jpg'" 
+          alt="Evidencia fotográfica de la incidencia" 
+          class="reporte-img"
+        />
+        <span class="status-tag" [ngClass]="reporte.estado.toLowerCase()">
+          {{ reporte.estado }}
+        </span>
+      </div>
+
+      <div class="location-box">
+        <h4>Ubicación del Incidente</h4>
+        <p class="address">📍 {{ reporte.direccion || 'Dirección no especificada' }}</p>
+        <p class="coords" *ngIf="reporte.latitud && reporte.longitud">
+          GPS: {{ reporte.latitud }}, {{ reporte.longitud }}
+        </p>
+      </div>
+    </div>
+
+    <!-- Columna Derecha: Información y Formulario de Decisiones (Triage) -->
+    <div class="card details-card">
+      <div class="header-details">
+        <span class="category-badge">
+          {{ reporte.categoriaNombre || 'Incidencia Urbana' }}
+        </span>
+        <small class="date">Registrado el: {{ reporte.creadoEn | date:'dd/MM/yyyy HH:mm' }}</small>
+      </div>
+
+      <h1 class="reporte-titulo">{{ reporte.titulo }}</h1>
+      <p class="reporte-descripcion">{{ reporte.descripcion }}</p>
+
+      <div class="citizen-info">
+        <p><strong>Reportado por:</strong> {{ reporte.ciudadanoNombre || 'Ciudadano Anónimo' }}</p>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Panel de Decisiones de Triage del Gestor (RN02) -->
+      <section class="triage-panel" *ngIf="reporte.estado === 'PENDIENTE'">
+        <h3>Triage y Definición de Prioridad (RN02)</h3>
+        <p class="help-text">
+          Defina la prioridad oficial de atención requerida para esta incidencia antes de su admisión.
+        </p>
+
+        <div class="form-group">
+          <label for="prioridadSelect">Prioridad Oficial:</label>
+          <select id="prioridadSelect" [(ngModel)]="prioridadSeleccionada" class="form-control">
+            <option value="BAJA">🟢 BAJA - Mantenimiento Programado</option>
+            <option value="MEDIA">🟡 MEDIA - Atencion Estándar</option>
+            <option value="ALTA">🟠 ALTA - Atención Prioritaria</option>
+            <option value="CRITICA">🔴 CRÍTICA - Riesgo Inminente / Emergencia</option>
+          </select>
+        </div>
+
+        <!-- Acciones Principales del Gestor -->
+        <div class="action-buttons">
+          <button type="button" class="btn-reject" (click)="mostrarModalRechazo = true">
+            ✕ Rechazar Reporte
+          </button>
+
+          <button type="button" class="btn-approve" (click)="admitirYPriorizar()">
+            ✓ Admitir y Priorizar
+          </button>
+        </div>
+      </section>
+
+      <!-- Panel de Estado si el Reporte ya fue procesado -->
+      <section class="processed-panel" *ngIf="reporte.estado !== 'PENDIENTE'">
+        <div class="info-box">
+          <p><strong>Estado Actual:</strong> {{ reporte.estado }}</p>
+          <p *ngIf="reporte.prioridad"><strong>Prioridad Asignada:</strong> {{ reporte.prioridad }}</p>
+          <p *ngIf="reporte.operadorAsignadoNombre">
+            <strong>Operador en Campo:</strong> {{ reporte.operadorAsignadoNombre }}
+          </p>
+          <p *ngIf="reporte.justificacionRechazo" class="text-danger">
+            <strong>Motivo de Rechazo:</strong> {{ reporte.justificacionRechazo }}
+          </p>
+        </div>
+      </section>
+    </div>
+
+  </div>
+
+  <!-- Modal de Rechazo Obligatorio (RN01) -->
+  <div class="modal-overlay" *ngIf="mostrarModalRechazo">
+    <div class="modal-card">
+      <h3>Rechazar Incidencia (RN01)</h3>
+      <p class="modal-desc">
+        Indique la justificación técnica de rechazo. Esta será notificada de forma transparente al ciudadano[cite: 5].
+      </p>
+
+      <div class="form-group">
+        <label for="motivoInput">Justificación de Rechazo (Obligatoria):</label>
+        <textarea 
+          id="motivoInput" 
+          [(ngModel)]="motivoRechazo" 
+          rows="4" 
+          placeholder="Ej. El reporte no corresponde a un espacio público de competencia municipal o carece de información..."
+          class="form-control"
+        ></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" (click)="mostrarModalRechazo = false; errorMessage = null;">
+          Cancelar
+        </button>
+        <button type="button" class="btn-confirm-reject" (click)="confirmarRechazo()">
+          Confirmar Rechazo
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Asignación a Operador / Cuadrilla (RF05) -->
+  <div class="modal-overlay" *ngIf="mostrarModalAsignar">
+    <div class="modal-card">
+      <h3>Asignación a Cuadrilla Operativa (RF05)</h3>
+      <p class="modal-desc">
+        Seleccione el operador responsable para ejecutar las acciones en terreno.
+      </p>
+
+      <div class="form-group">
+        <label for="operadorSelect">Operador / Cuadrilla Responsable:</label>
+        <select id="operadorSelect" [(ngModel)]="operadorSeleccionadoId" class="form-control">
+          <option *ngFor="let op of operadores" [value]="op.id">
+            👤 {{ op.nombre }} ({{ op.email }})
+          </option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="notasInput">Instrucciones / Notas de Campo (Opcional):</label>
+        <textarea 
+          id="notasInput" 
+          [(ngModel)]="notasAsignacion" 
+          rows="3" 
+          placeholder="Ej. Inspeccionar tramo vial y realizar parcheo de emergencia con mezcla asfáltica..."
+          class="form-control"
+        ></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn-confirm-assign" (click)="confirmarAsignacion()">
+          Finalizar Asignación y Notificar
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>

@@ -1,0 +1,45 @@
+<div class="login-container">
+  <div class="login-card">
+    <div class="brand-header">
+      <img src="assets/logo-ciudadactiva.svg" alt="CiudadActiva Logo" class="logo" />
+      <h2>ciudadactiva</h2>
+      <p class="subtitle">Gestión y Seguimiento Comunitario</p>
+    </div>
+
+    <!-- Cuentas Demo -->
+    <div class="demo-buttons">
+      <p class="demo-title">Acceso Rápido Pruebas:</p>
+      <div class="btn-group">
+        <button *ngFor="let acc of demoAccounts" (click)="selectDemoAccount(acc)" type="button" class="btn-demo">
+          {{ acc.label }}
+        </button>
+      </div>
+    </div>
+
+    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+      <div class="form-group">
+        <label>Correo Electrónico</label>
+        <input type="email" formControlName="email" placeholder="tu_correo@ejemplo.com" class="form-control" />
+      </div>
+
+      <div class="form-group">
+        <label>Contraseña</label>
+        <div class="password-input">
+          <input [type]="passwordVisible ? 'text' : 'password'" formControlName="password" placeholder="••••••••" class="form-control" />
+          <button type="button" (click)="togglePasswordVisibility()" class="btn-eye">
+            {{ passwordVisible ? '🙈' : '👁️' }}
+          </button>
+        </div>
+      </div>
+
+      <div *ngIf="errorMessage" class="error-banner">
+        {{ errorMessage }}
+      </div>
+
+      <button type="submit" [disabled]="loginForm.invalid || isLoading" class="btn-submit">
+        <span *ngIf="!isLoading">Ingresar a la Plataforma</span>
+        <span *ngIf="isLoading">Cargando...</span>
+      </button>
+    </form>
+  </div>
+</div>
